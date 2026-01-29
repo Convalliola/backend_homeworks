@@ -1,9 +1,11 @@
 from contextlib import asynccontextmanager
 import logging
+import os
 
 from fastapi import FastAPI
 
 from model import load_or_train_model, DEFAULT_MODEL_PATH
+from mlflow_utils import load_model_from_mlflow, parse_bool_env, default_tracking_uri
 from routes.predict import router as predict_router
 
 
@@ -19,8 +21,25 @@ logger = logging.getLogger("app")
 async def lifespan(app: FastAPI):
     # startup
     try:
-        app.state.model = load_or_train_model(DEFAULT_MODEL_PATH)
-        logger.info("ML model is ready: %s", DEFAULT_MODEL_PATH)
+        use_mlflow = parse_bool_env("USE_MLFLOW", default=False)
+        if use_mlflow:
+            model_name = os.getenv("MLFLOW_MODEL_NAME", "moderation-model")
+            stage = os.getenv("MLFLOW_MODEL_STAGE", "Production")
+            tracking_uri = os.getenv("MLFLOW_TRACKING_URI") or default_tracking_uri()
+            app.state.model = load_model_from_mlflow(
+                model_name=model_name,
+                stage=stage,
+                tracking_uri=tracking_uri,
+            )
+            logger.info(
+                "ML model is ready (mlflow): name=%s stage=%s tracking_uri=%s",
+                model_name,
+                stage,
+                tracking_uri,
+            )
+        else:
+            app.state.model = load_or_train_model(DEFAULT_MODEL_PATH)
+            logger.info("ML model is ready (local): %s", DEFAULT_MODEL_PATH)
     except Exception:
         logger.exception("Failed to initialize ML model")
         raise
