@@ -24,7 +24,7 @@ def make_payload(**overrides):
     return payload
 
 
-def test_predict_success_is_violation_true(monkeypatch):
+def test_predict_success_is_valid_true(monkeypatch):
     import main  
 
     monkeypatch.setattr(main, "load_or_train_model", lambda *_args, **_kwargs: FakeModel(0.9))
@@ -33,11 +33,11 @@ def test_predict_success_is_violation_true(monkeypatch):
         resp = client.post("/predict", json=make_payload())
 
     assert resp.status_code == 200
-    assert resp.json()["is_violation"] is True
+    assert resp.json()["is_valid"] is True
     assert abs(resp.json()["probability"] - 0.9) < 1e-9
 
 
-def test_predict_success_is_violation_false(monkeypatch):
+def test_predict_success_is_valid_false(monkeypatch):
     import main
 
     monkeypatch.setattr(main, "load_or_train_model", lambda *_args, **_kwargs: FakeModel(0.1))
@@ -46,7 +46,7 @@ def test_predict_success_is_violation_false(monkeypatch):
         resp = client.post("/predict", json=make_payload())
 
     assert resp.status_code == 200
-    assert resp.json()["is_violation"] is False
+    assert resp.json()["is_valid"] is False
     assert abs(resp.json()["probability"] - 0.1) < 1e-9
 
 

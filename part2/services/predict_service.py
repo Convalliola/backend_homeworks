@@ -1,22 +1,21 @@
 from __future__ import annotations
 
 import logging
-import numpy as np
 
 from errors import PredictionError
 
 logger = logging.getLogger("app.predict")
 
 
-def to_features(*, is_verified_seller: bool, images_qty: int, description: str, category: int) -> np.ndarray:
+def to_features(*, is_verified_seller: bool, images_qty: int, description: str, category: int) -> list[list[float]]:
     x0 = 1.0 if is_verified_seller else 0.0
     x1 = float(images_qty) / 10.0
     x2 = float(len(description)) / 1000.0
     x3 = float(category) / 100.0
-    return np.array([[x0, x1, x2, x3]], dtype=float)
+    return [[x0, x1, x2, x3]]
 
 
-def predict_violation(
+def predict_validity(
     model,
     *,
     seller_id: int,
@@ -33,7 +32,7 @@ def predict_violation(
         category=category,
     )
 
-    features = X[0].tolist()
+    features = X[0]
     logger.info(
         "predict_request seller_id=%s item_id=%s features=%s",
         seller_id, item_id, features
@@ -41,7 +40,7 @@ def predict_violation(
 
     try:
         proba = float(model.predict_proba(X)[0][1])
-        is_violation = bool(proba >= 0.5)
+        is_valid = bool(proba >= 0.5)
     except Exception as e:
         logger.exception(
             "predict_failed seller_id=%s item_id=%s",
@@ -51,8 +50,8 @@ def predict_violation(
         raise PredictionError("Prediction failed") from e
 
     logger.info(
-        "predict_result seller_id=%s item_id=%s is_violation=%s probability=%.6f",
-        seller_id, item_id, is_violation, proba
+        "predict_result seller_id=%s item_id=%s is_valid=%s probability=%.6f",
+        seller_id, item_id, is_valid, proba
     )
 
-    return is_violation, proba
+    return is_valid, proba

@@ -2,7 +2,7 @@ from __future__ import annotations
 from fastapi import APIRouter, Depends, Request
 from pydantic import BaseModel, Field, conint, confloat
 from errors import ModelNotLoadedError
-from services.predict_service import predict_violation
+from services.predict_service import predict_validity
 
 router = APIRouter()
 
@@ -18,7 +18,7 @@ class PredictRequest(BaseModel):
 
 
 class PredictResponse(BaseModel):
-    is_violation: bool
+    is_valid: bool
     probability: confloat(ge=0.0, le=1.0)
 
 
@@ -31,7 +31,7 @@ def get_model(request: Request):
 
 @router.post("/predict", response_model=PredictResponse)
 def predict_handler(req: PredictRequest, model=Depends(get_model)) -> PredictResponse:
-    is_v, proba = predict_violation(
+    is_valid, proba = predict_validity(
         model,
         seller_id=req.seller_id,
         item_id=req.item_id,
@@ -40,4 +40,4 @@ def predict_handler(req: PredictRequest, model=Depends(get_model)) -> PredictRes
         description=req.description,
         category=req.category,
     )
-    return PredictResponse(is_violation=is_v, probability=proba)
+    return PredictResponse(is_valid=is_valid, probability=proba)
