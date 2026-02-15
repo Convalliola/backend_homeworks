@@ -1,0 +1,11 @@
+fastapi
+uvicorn[standard]
+pydantic
+scikit-learn
+numpy
+pytest
+httpx
+asyncpg
+psycopg2-binary
+yandex-pgmigrate
+aiokafka
