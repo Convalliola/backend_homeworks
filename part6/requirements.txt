@@ -1,0 +1,17 @@
+fastapi
+uvicorn[standard]
+pydantic
+scikit-learn
+numpy
+pytest
+httpx
+asyncpg
+psycopg2-binary
+yandex-pgmigrate
+aiokafka
+redis
+fakeredis
+pytest-asyncio
+prometheus-client
+prometheus-fastapi-instrumentator
+sentry-sdk[fastapi]
