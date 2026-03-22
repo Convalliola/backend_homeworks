@@ -32,6 +32,7 @@ docker compose up -d
 | Kafka Console    | `http://localhost:8080` |
 | PostgreSQL       | `localhost:5435` (db: `hw`, user/pass: `postgres`) |
 | Redis            | `localhost:6379` |
+| MLflow           | `http://localhost:5000` (UI и tracking API) |
 | Prometheus       | `http://localhost:9090` |
 | Grafana          | `http://localhost:3000` (admin/admin) |
 
@@ -51,7 +52,7 @@ pgmigrate -c "host=127.0.0.1 port=5435 dbname=hw user=$PG_USER password=$PG_PASS
 | `REDIS_HOST`, `REDIS_PORT` | Redis | `localhost:6379` |
 | `JWT_SECRET` | Секрет для подписи JWT | `super-secret-key-change-me` |
 | `USE_MLFLOW` | Загружать модель из MLflow (`true`/`false`) | `false` |
-| `MLFLOW_TRACKING_URI` | URI трекинг-сервера MLflow | `sqlite:///mlflow.db` |
+| `MLFLOW_TRACKING_URI` | URI трекинг-сервера MLflow | `sqlite:///mlflow.db` локально или `http://127.0.0.1:5000` при MLflow из compose |
 | `MLFLOW_MODEL_NAME` | Имя модели в MLflow Registry | `moderation-model` |
 | `MLFLOW_MODEL_STAGE` | Стадия модели | `Production` |
 | `SENTRY_DSN` | DSN для Sentry (опционально) | — |
@@ -80,19 +81,33 @@ python -m workers.moderation_worker
 
 ### Загрузка из MLflow
 
-1. Зарегистрируйте модель:
+**Вариант A — MLflow из Docker Compose** (рекомендуется для единой инфраструктуры):
+
+1. Поднимите стек: `docker compose up -d` (сервис `mlflow` на порту `5000`).
+2. Укажите трекинг URI и зарегистрируйте модель в том же хранилище, что и сервер:
 
 ```bash
+export MLFLOW_TRACKING_URI=http://127.0.0.1:5000
 python register_model.py
 ```
 
-2. Переведите модель в Production (через MLflow UI или CLI).
+3. Переведите модель в стадию **Production** (MLflow UI `http://localhost:5000` или CLI).
 
-3. Включите загрузку из MLflow:
+4. Запустите приложение с:
 
 ```bash
 export USE_MLFLOW=true
+export MLFLOW_TRACKING_URI=http://127.0.0.1:5000
+uvicorn main:app --reload
 ```
+
+**Вариант B — локальный SQLite без контейнера** (файл `mlflow.db` в каталоге проекта):
+
+1. `python register_model.py` (по умолчанию `MLFLOW_TRACKING_URI` указывает на локальный файл).
+2. Переведите модель в Production.
+3. `export USE_MLFLOW=true` и запуск приложения.
+
+> Воркер и API должны использовать тот же `MLFLOW_TRACKING_URI`, что и при регистрации модели.
 
 ## API-эндпоинты
 
@@ -107,6 +122,10 @@ export USE_MLFLOW=true
 | GET | `/moderation_result/{task_id}` | Статус/результат модерации |
 | POST | `/close?item_id=N` | Закрытие объявления, инвалидация кэша |
 | GET | `/metrics` | Метрики Prometheus |
+
+### Поведение `POST /close`
+
+Объявление **не удаляется** из таблицы `ads`. Выполняется **мягкое закрытие**: в строке выставляется `is_closed = TRUE` (объявление больше не участвует в выдаче/модерации в рамках текущей логики). После этого удаляются связанные записи модерации и инвалидируются ключи в Redis (`predict:item`, `moderation:result` для затронутых задач). Физическое удаление строки объявления (`DELETE`) в этом эндпоинте не используется.
 
 ### Пример использования
 
